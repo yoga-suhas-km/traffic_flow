@@ -27,6 +27,15 @@ import pyunpack
 import wget
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
+import ssl
+from io import BytesIO
+from zipfile import ZipFile
+import urllib
+from urllib.request import urlopen
+from urllib.request import urlopen
+import zipfile, io
+from sklearn.preprocessing import LabelEncoder
+
 
 
 def train_test_validation_set_split(x, y, train_ratio, test_ratio, validation_ratio):
@@ -170,6 +179,7 @@ def process_data(train, test, lags):
     df1 = pd.read_csv(train, encoding='utf-8').fillna(0)
     df2 = pd.read_csv(test, encoding='utf-8').fillna(0)
 
+
     # scaler = StandardScaler().fit(df1[attr].values)
     scaler = MinMaxScaler(feature_range=(0, 1)).fit(df1[attr].values.reshape(-1, 1))
     flow1 = scaler.transform(df1[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
@@ -192,6 +202,35 @@ def process_data(train, test, lags):
 
     return X_train, y_train, X_test, y_test, scaler
 
+def nyc_bike_process_data(train, test, lags):
+
+    attr = 'hourly_traffic_count'
+    df1 = pd.read_csv(train, encoding='utf-8').fillna(0)
+    df2 = pd.read_csv(test, encoding='utf-8').fillna(0)
+
+    # scaler = StandardScaler().fit(df1[attr].values)
+    scaler = MinMaxScaler(feature_range=(0, 1)).fit(df1[attr].values.reshape(-1, 1))
+    flow1 = scaler.transform(df1[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
+    flow2 = scaler.transform(df2[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
+
+    train, test = [], []
+    for i in range(lags, len(flow1)):
+        train.append(flow1[i - lags: i + 1])
+    for i in range(lags, len(flow2)):
+        test.append(flow2[i - lags: i + 1])
+
+    train = np.array(train)
+    test = np.array(test)
+    np.random.shuffle(train)
+
+    X_train = train[:, :-1]
+    y_train = train[:, -1]
+    X_test = test[:, :-1]
+    y_test = test[:, -1]
+
+    return X_train, y_train, X_test, y_test, scaler
+    
+
 
 def load_data(data, force_download):
     
@@ -202,21 +241,24 @@ def load_data(data, force_download):
         recreate_folder("data")    
     
     if data == "Traffic_classification" or data == "traffic_classification":
-
         X , y = download_traffic(force_download)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=42)
         scaler = None
     elif data == "PEMS traffic prediction":
         X_train,y_train, X_test, y_test, scaler = process_data('data/train.csv', 'data/test.csv', 5)
-        
+    elif data == "nyc_bike_dataset":
+        X_train,y_train, X_test, y_test, scaler  = nyc_bike_process_data('data/train_1.csv', 'data/test_1.csv', 5)
+    
     return X_train, X_test, y_train, y_test, scaler
 
 
 if __name__ == "__main__":
 
     #X_train, X_test, y_train, y_test, scaler = load_data(data = "Traffic_classification", force_download = False)
-    X_train, X_test, y_train, y_test, scaler = load_data(data = "PEMS traffic prediction", force_download = False)
+    #X_train, X_test, y_train, y_test, scaler = load_data(data = "PEMS traffic prediction", force_download = False)
+    X_train, X_test, y_train, y_test, scaler = load_data(data = "nyc_bike_dataset", force_download = False)
     
+    print(X_train)
     print(X_train.shape)
     
 

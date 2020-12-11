@@ -1,12 +1,18 @@
 """
 Traffic Flow Prediction with Neural Networks(SAEs、LSTM、GRU).
 """
+import sys
+import warnings
+import argparse
 import math
 import warnings
 import numpy as np
 import pandas as pd
 from process_data import load_data
-from keras.models import load_model
+#from keras.models import load_model
+import _pickle as cPickle
+import tensorflow as tf 
+
 from keras.utils.vis_utils import plot_model
 import sklearn.metrics as metrics
 import matplotlib as mpl
@@ -71,7 +77,7 @@ def plot_results(y_true, y_preds, names):
         y_pred: List/ndarray, predicted data.
         names: List, Method names.
     """
-    d = '2016-3-4 00:00'
+    d = '2015-10-04 00:00'
     x = pd.date_range(d, periods=288, freq='5min')
 
     fig = plt.figure()
@@ -93,29 +99,76 @@ def plot_results(y_true, y_preds, names):
     plt.show()
 
 
-def main():
-    lstm = load_model('model/lstm.h5')
-    gru = load_model('model/gru.h5')
-    saes = load_model('model/saes.h5')
-    models = [lstm, gru, saes]
-    names = ['LSTM', 'GRU', 'SAEs']
+def main(argv):
 
-    lag = 12
-    file1 = 'data/train.csv'
-    file2 = 'data/test.csv'
-    #_, _, X_test, y_test, scaler = process_data(file1, file2, lag)
-    X_train, X_test, y_train, y_test, scaler = load_data(data = "PEMS traffic prediction", force_download = False)
-  
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--data",
+        default="pems",
+        help="data to use")
+    args = parser.parse_args()
+    
+    if args.data == "pems":
+        lstm = tf.keras.models.load_model('model_pems/lstm.h5')
+       
+        gru = tf.keras.models.load_model('model_pems/gru.h5')
+
+        saes = tf.keras.models.load_model('model_pems/saes.h5')
+        
+        cnn_lstm = tf.keras.models.load_model('model_pems/cnn_lstm.h5')
+        
+        with open('model_pems/rf.h5', 'rb') as f:
+            rf = cPickle.load(f)    
+        
+        en_1 = tf.keras.models.load_model('model_pems/en_1.h5')
+        
+        en_2 = tf.keras.models.load_model('model_pems/en_2.h5')
+        
+        en_3 = tf.keras.models.load_model('model_pems/en_3.h5')
+    
+    elif args.data == "nyc":
+
+        lstm = tf.keras.models.load_model('model_nyc/lstm.h5')
+       
+        gru = tf.keras.models.load_model('model_nyc/gru.h5')
+
+        saes = tf.keras.models.load_model('model_nyc/saes.h5')
+        
+        cnn_lstm = tf.keras.models.load_model('model_nyc/cnn_lstm.h5')
+        
+        with open('model_nyc/rf.h5', 'rb') as f:
+            rf = cPickle.load(f)    
+        
+        en_1 = tf.keras.models.load_model('model_nyc/en_1.h5')
+        
+        en_2 = tf.keras.models.load_model('model_nyc/en_2.h5')
+        
+        en_3 = tf.keras.models.load_model('model_nyc/en_3.h5')
+
+
+    models = [lstm, gru, saes, cnn_lstm, rf, en_1, en_2, en_3]
+    names = ['LSTM', 'GRU', 'SAEs', 'CNN_LSTM', 'rf', 'EN_1', 'EN_2', 'EN_3']
+
+
+    if args.data == "pems":
+        X_train, X_test, y_train, y_test, scaler = load_data(data = "PEMS traffic prediction", force_download = False)
+    elif args.data == "nyc":
+        X_train, X_test, y_train, y_test, scaler = load_data(data = "nyc_bike_dataset", force_download = False)
+
+    rf_bk = X_test
+    
     y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
 
     y_preds = []
     for name, model in zip(names, models):
         if name == 'SAEs':
             X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1]))
-        else:
+        elif name == 'LSTM' or name == 'GRU' or name == 'CNN_LSTM' or name =="EN_1" or name =="EN_2" or name =="EN_3":
             X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+        else:    
+            X_test = rf_bk
+        
         file = 'images/' + name + '.png'
-        #plot_model(model, to_file=file, show_shapes=True)
         predicted = model.predict(X_test)
         predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
         y_preds.append(predicted[:288])
@@ -126,4 +179,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)
